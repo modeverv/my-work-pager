@@ -17,6 +17,9 @@ import WorkPagerCore
     @Published private(set) var template: SoundTemplate?
     @Published var audioStatus = "入力停止"
     @Published var learnStatus = "未学習"
+    @Published private(set) var cameraDebugFrame: CameraDebugFrame?
+    private var debugVisible = false
+    private var debugGeneration = UUID()
     @Published var cameraStatus = "カメラ停止"
     @Published var notificationStatus = "未送信"
     @Published private(set) var sending = false
@@ -49,7 +52,8 @@ import WorkPagerCore
     func refreshDevices() {
         let latest = AudioDevices.inputs()
         if latest != devices { devices = latest }
-        cameras = CameraPresence.devices()
+        let latestCameras = CameraPresence.devices()
+        if latestCameras.map(\.uniqueID) != cameras.map(\.uniqueID) { cameras = latestCameras }
         if !didDiscoverDevices, settings.deviceUID.isEmpty, let first = devices.first(where: { $0.name.localizedCaseInsensitiveContains("Fireface") }) ?? devices.first {
             settings.deviceUID = first.uid; settings.channel = 0
         }
@@ -147,14 +151,32 @@ import WorkPagerCore
             }
         }
     }
+    func setCameraDebugVisible(_ visible: Bool) {
+        debugVisible = visible
+        configureCameraDebug()
+    }
+    private func configureCameraDebug() {
+        debugGeneration = UUID(); let current = debugGeneration
+        cameraDebugFrame = nil
+        guard debugVisible, settings.autoMode else { camera.setDebugHandler(nil); return }
+        camera.setDebugHandler { [weak self] frame in
+            Task { @MainActor in
+                guard let self, self.debugVisible, self.settings.autoMode, current == self.debugGeneration,
+                      ProcessInfo.processInfo.systemUptime - frame.capturedAt < 2 else { return }
+                self.cameraDebugFrame = frame
+            }
+        }
+    }
     func modeChanged() {
         autoController.resume(); stableDuration = 0
+        configureCameraDebug()
         if settings.autoMode { startCamera() } else { cameraGeneration = UUID(); camera.stop(); cameraStatus = cameraFailureMessage ?? "手動モード" }
     }
     func resumeAuto() { autoController.resume(); stableDuration = 0 }
     func cameraChanged() { autoController.reset(); stableDuration = 0; if settings.autoMode { startCamera() } }
     func delayChanged() { autoController.reset(); stableDuration = 0 }
     private func startCamera() {
+        configureCameraDebug()
         cameraGeneration = UUID(); let current = cameraGeneration
         lastPresenceSample = nil; cameraFailureMessage = nil
         cameraStatus = "カメラ起動中"
@@ -185,6 +207,7 @@ import WorkPagerCore
     private func cameraFallback(_ message: String) {
         cameraFailureMessage = message
         cameraGeneration = UUID(); camera.stop(); settings.autoMode = false
+        configureCameraDebug()
         autoController.resume(); stableDuration = 0; cameraStatus = message
         // Preserve the explicit ARM state when the camera becomes unavailable.
     }

@@ -8,10 +8,16 @@ import SwiftUI
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.shutdown() }
         }.defaultSize(width: 520, height: 800)
         .windowResizability(.contentMinSize)
+        Window("カメラ検出デバッグ", id: "camera-debug") {
+            CameraDebugView(model: model)
+                .onAppear { model.setCameraDebugVisible(true) }
+                .onDisappear { model.setCameraDebugVisible(false) }
+        }.defaultSize(width: 780, height: 680)
     }
 }
 
 struct ContentView: View {
+    @Environment(\.openWindow) private var openWindow
     @ObservedObject var model: AppModel
     var body: some View {
         ScrollView {
@@ -72,6 +78,7 @@ struct ContentView: View {
                             if !model.settings.cameraID.isEmpty && !model.cameras.contains(where: { $0.uniqueID == model.settings.cameraID }) { Text("未接続のカメラ").tag(model.settings.cameraID) }
                         }.onChange(of: model.settings.cameraID) { model.cameraChanged() }
                         Text(model.cameraStatus).font(.caption)
+                        Button("カメラ映像・検出枠を表示") { openWindow(id: "camera-debug") }
                         if model.settings.autoMode, let present = model.autoController.presence {
                             Text("\(present ? "在席" : "不在")継続: \(Int(model.stableDuration)) / \(Int(present ? model.settings.disarmDelay : model.settings.armDelay))秒").font(.caption).monospacedDigit()
                         }

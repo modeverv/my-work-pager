@@ -1,10 +1,16 @@
 import Foundation
 import AVFoundation
 import Vision
+import CoreImage
 
 final class CameraPresence: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private let queue = DispatchQueue(label: "WorkPager.camera")
     private let session = AVCaptureSession()
+    private let imageContext = CIContext(options: [.cacheIntermediates: false])
+    private var debugHandler: ((CameraDebugFrame) -> Void)?
+    func setDebugHandler(_ handler: ((CameraDebugFrame) -> Void)?) {
+        queue.async { [weak self] in self?.debugHandler = handler }
+    }
     private var lastAnalysis = 0.0
     private var lastFrame = 0.0
     private var watchdog: DispatchSourceTimer?
@@ -66,7 +72,14 @@ final class CameraPresence: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
             let request = VNDetectHumanRectanglesRequest()
             request.upperBodyOnly = true
             try VNImageRequestHandler(cvPixelBuffer: pixels, options: [:]).perform([request])
-            onPresence?(request.results?.contains(where: { $0.confidence >= 0.5 }) ?? false)
+            let people = (request.results ?? []).map { CameraDebugPerson(bounds: $0.boundingBox, confidence: $0.confidence) }
+            onPresence?(people.contains(where: { $0.countsAsPresent }))
+            if let debugHandler {
+                let input = CIImage(cvPixelBuffer: pixels)
+                if let image = imageContext.createCGImage(input, from: input.extent) {
+                    debugHandler(CameraDebugFrame(image: image, people: people, capturedAt: now))
+                }
+            }
         } catch { onFailure?("人物検出エラー。手動操作に切り替えました。") }
     }
 }
