@@ -2,6 +2,42 @@
 
 Swift / SwiftUIのmacOS向け通知音ページャーです。選択した音声入力で学習済みの通知音を検出し、ARM中だけntfyへ「仕事PCを確認」を送ります。
 
+## アプリ画面
+
+<img src="docs/images/work-pager-main.png" alt="Work Pagerのメイン画面。ARM状態、音声入力、通知音の学習、カメラによる自動制御の設定を表示。" width="520">
+
+実機での表示例です。デバイス・チャンネル・判定時間は撮影時の設定で、初期値とは異なります。`AUTO: OVERRIDDEN`は手動操作が優先されている状態です。画面内の「入力欠落」は、音声バッファの欠落を検知して候補を破棄した診断表示です。カメラ映像・秘密topicの値は掲載していません。
+
+## 動作概要
+
+```mermaid
+flowchart TB
+    PC["会社PCのSlack通知音"] -->|物理音声接続| RME["RMEの指定入力チャンネル"]
+    DEV["開発時：MacのSlack"] -.->|BlackHole| INPUT
+
+    subgraph MAC["Mac内で処理（音声・画像は外部送信しない）"]
+        INPUT["音声入力"] --> MATCH["通知音を照合"]
+        INPUT -->|Learn| REF["学習テンプレートをローカル保存"]
+        REF --> MATCH
+        CAMERA["カメラ"] --> VISION["Visionで人物検出"]
+        VISION --> AUTO["不在が継続：ARM / 在席が継続：DISARM"]
+        AUTO --> STATE["ARM状態"]
+        MANUAL["手動ARM / DISARM"] --> STATE
+        MATCH --> GATE{"ARM中・しきい値以上・クールダウン経過？"}
+        STATE --> GATE
+    end
+
+    RME --> INPUT
+    GATE -->|はい：固定メッセージのみHTTPS送信| NTFY["ntfy"]
+    GATE -->|いいえ| SKIP["通知しない"]
+    NTFY --> PHONE["iPhone：仕事PCを確認"]
+```
+
+- **音声**：指定チャンネルの通知音を学習し、その音との一致度で検出します。DISARM中の音声入力は停止し、学習・入力確認時だけ一時的に開きます。
+- **カメラ**：初期値は不在30秒でARM、在席5秒でDISARM。画面内の人物を対象にし、本人の識別は行いません。
+- **手動操作**：Auto中にARM/DISARMを操作すると自動制御を一時停止し、`Resume Auto`で再開します。
+- **外部通信**：送信するのは固定のタイトル`Work Pager`と本文`仕事PCを確認`だけです。音声・カメラ画像・Slack本文は送信しません。
+
 ## ビルド・起動
 
 macOS 14以降、Swift 6対応Xcode。外部パッケージ依存はありません。
