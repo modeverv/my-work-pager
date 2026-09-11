@@ -19,7 +19,7 @@ final class WorkPagerAppDelegate: NSObject, NSApplicationDelegate {
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.shutdown() }
         }.defaultSize(width: 448, height: 440)
         .windowResizability(.contentSize)
-        Settings { PagerSettingsView(model: model) }
+        Settings { PagerSettingsView(model: model).equatable() }
         Window("カメラ検出デバッグ", id: "camera-debug") {
             CameraDebugView(model: model)
                 .onAppear { model.setCameraDebugVisible(true) }

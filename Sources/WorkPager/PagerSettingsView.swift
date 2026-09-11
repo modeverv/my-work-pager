@@ -1,10 +1,24 @@
 import SwiftUI
 
-struct PagerSettingsView: View {
-    @Environment(\.openWindow) private var openWindow
-    @ObservedObject var model: AppModel
+// Keep the tab toolbar independent of the frequently published audio/camera state.
+struct PagerSettingsView: View, Equatable {
+    let model: AppModel
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.model === rhs.model }
     var body: some View {
         TabView {
+            AudioSettingsView(model: model)
+                .tabItem { Label("音声・検出", systemImage: "waveform") }
+            CameraSettingsView(model: model)
+                .tabItem { Label("カメラ・自動ARM", systemImage: "camera") }
+            NotificationSettingsView(model: model)
+                .tabItem { Label("通知", systemImage: "bell") }
+        }.padding(12).frame(width: 550, height: 500)
+    }
+}
+
+private struct AudioSettingsView: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
             ScrollView {
                 VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -39,7 +53,28 @@ struct PagerSettingsView: View {
                 }
 
                 }.padding(20)
-            }.tabItem { Label("音声・検出", systemImage: "waveform") }
+            }
+    }
+    private func secondsField(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField(title, value: value, format: .number.precision(.fractionLength(0)))
+                .frame(width: 65).textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing)
+                .onChange(of: value.wrappedValue) {
+                    if !value.wrappedValue.isFinite { value.wrappedValue = range.lowerBound }
+                    else { value.wrappedValue = min(range.upperBound, max(range.lowerBound, value.wrappedValue)) }
+                }
+            Text("秒").foregroundStyle(.secondary)
+        }
+    }
+
+}
+
+private struct CameraSettingsView: View {
+    @Environment(\.openWindow) private var openWindow
+    @ObservedObject var model: AppModel
+    var body: some View {
             ScrollView {
                 VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -62,7 +97,27 @@ struct PagerSettingsView: View {
                 }
 
                 }.padding(20)
-            }.tabItem { Label("カメラ・自動ARM", systemImage: "camera") }
+            }
+    }
+    private func secondsField(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField(title, value: value, format: .number.precision(.fractionLength(0)))
+                .frame(width: 65).textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing)
+                .onChange(of: value.wrappedValue) {
+                    if !value.wrappedValue.isFinite { value.wrappedValue = range.lowerBound }
+                    else { value.wrappedValue = min(range.upperBound, max(range.lowerBound, value.wrappedValue)) }
+                }
+            Text("秒").foregroundStyle(.secondary)
+        }
+    }
+
+}
+
+private struct NotificationSettingsView: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
             ScrollView {
                 VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -84,21 +139,6 @@ struct PagerSettingsView: View {
                     Text("音声・カメラ画像は外部送信しません。カメラ画像は保存しません。")
                         .font(.caption).foregroundStyle(.secondary)
                 }.padding(20)
-            }.tabItem { Label("通知", systemImage: "bell") }
-        }.padding(12).frame(width: 550, height: 500)
+            }
     }
-    private func secondsField(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            TextField(title, value: value, format: .number.precision(.fractionLength(0)))
-                .frame(width: 65).textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing)
-                .onChange(of: value.wrappedValue) {
-                    if !value.wrappedValue.isFinite { value.wrappedValue = range.lowerBound }
-                    else { value.wrappedValue = min(range.upperBound, max(range.lowerBound, value.wrappedValue)) }
-                }
-            Text("秒").foregroundStyle(.secondary)
-        }
-    }
-
 }
