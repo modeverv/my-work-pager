@@ -1,6 +1,17 @@
 import SwiftUI
 
+final class WorkPagerAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Load the bundled artwork directly so a previously cached generic Dock icon
+        // does not survive an in-place update of this locally built app.
+        guard let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+              let icon = NSImage(contentsOf: url) else { return }
+        NSApplication.shared.applicationIconImage = icon
+    }
+}
+
 @main struct WorkPagerApp: App {
+    @NSApplicationDelegateAdaptor(WorkPagerAppDelegate.self) private var delegate
     @StateObject private var model = AppModel()
     var body: some Scene {
         Window("Work Pager", id: "main") {
